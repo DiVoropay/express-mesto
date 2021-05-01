@@ -1,8 +1,15 @@
+const path = require('path');
 const express = require('express');
-// Слушаем 3000 порт
+
+const mongoose = require('mongoose');
+
 const { PORT = 3000 } = process.env;
+const currentUser = { _id: "608d632b93210f24a84242db" } //решение до следующего спринта
 
 const app = express();
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 mongoose.connect('mongodb://localhost:27017/mestodb', {
   useNewUrlParser: true,
@@ -10,17 +17,29 @@ mongoose.connect('mongodb://localhost:27017/mestodb', {
   useFindAndModify: false
 });
 
-app.listen(PORT, () => {
-    // Если всё работает, консоль покажет, какой порт приложение слушает
-    console.log(`App listening on port ${PORT}`)
+app.use((req, res, next) => {
+  req.user = {
+    _id: currentUser._id
+  };
 
-    app.get('/', (req, res) => {
-      res.send(
-            `<html>
+  next();
+});
+
+app.use('/users', require('./routes/users'));
+app.use('/cards', require('./routes/cards'));
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.listen(PORT, () => {
+  console.log(`App listening on port ${PORT}`);
+
+  app.get('/', (req, res) => {
+    res.send(
+      `<html>
             <body>
                 <p>Ответ на сигнал</p>
             </body>
             </html>`
-        );
-    });
+    );
+  });
 })
