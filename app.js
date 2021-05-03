@@ -29,9 +29,9 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/users', require('./routes/users'));
 app.use('/cards', require('./routes/cards'));
+
 app.use('/', (req, res) => {
-  res.status(404).send(
-    { message: `Страница не существует` } )
+  res.status(404).send({ message: 'Страница не существует' });
 });
 
 app.listen(PORT, () => {});
