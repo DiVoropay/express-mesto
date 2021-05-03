@@ -5,7 +5,7 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "lint": "npx eslint",
+    "lint": "npx eslint .",
     "dev": "nodemon app.js"
   },
   "keywords": [],
@@ -20,6 +20,7 @@
     "eslint": "^7.25.0",
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-config-eslint": "^7.0.0",
+    "eslint-plugin-import": "^2.22.1",
     "i": "^0.3.6",
     "nodemon": "^2.0.7",
     "npm": "^7.11.1"
