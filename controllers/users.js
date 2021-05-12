@@ -1,3 +1,5 @@
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 
 const handlerError = (err, res) => {
@@ -20,6 +22,16 @@ const handlerError = (err, res) => {
   }
 };
 
+module.exports.login = (req, res) => {
+  const { email, password } = req.body;
+  return User.findUserByCredentials(email, password)
+    .then((user) => {
+      const token = jwt.sign({ _id: user._id }, 'super-strong-secret', { expiresIn: '7d' });
+      res.send({ token });
+    })
+    .catch((err) => handlerError(err, res));
+};
+
 module.exports.getUsers = (req, res) => {
   User.find({})
     .then((users) => res.send({ users }))
@@ -31,15 +43,34 @@ module.exports.getUser = (req, res) => {
 
   User.findById({ _id: userId })
     .orFail(() => ({ name: 'EmptyData' }))
-    .then((users) => res.send(users))
+    .then((user) => res.send(user))
+    .catch((err) => handlerError(err, res));
+};
+
+module.exports.getCurrentUser = (req, res) => {
+  User.findById({ _id: req.user._id })
+    .orFail(() => ({ name: 'EmptyData' }))
+    .then((user) => res.send(user))
     .catch((err) => handlerError(err, res));
 };
 
 module.exports.createUser = (req, res) => {
-  const { name, about, avatar } = req.body;
+  const {
+    email, password, name, about, avatar,
+  } = req.body;
 
-  User.create({ name, about, avatar })
-    .then((user) => res.send(user))
+  bcrypt.hash(password, 10)
+    .then((hash) => {
+      User.create({
+        email,
+        password: hash,
+        name,
+        about,
+        avatar,
+      })
+        .then((user) => res.send(user))
+        .catch((err) => handlerError(err, res));
+    })
     .catch((err) => handlerError(err, res));
 };
 
