@@ -2,79 +2,84 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 
-const handlerError = (err, res) => {
-  switch (err.name) {
-    case 'ValidationError':
-      return res.status(400).send(
-        { message: `${Object.values(err.errors).map((error) => error.message).join(', ')}` },
-      );
-    case 'CastError':
-      return res.status(400).send(
-        { message: `Ошибка запроса ${err.message}` },
-      );
-    case 'EmptyData':
-      return res.status(404).send(
-        { message: 'Пользователь с указанным _id не найден' },
-      );
-    default: return res.status(500).send(
-      { message: `На сервере произошла ошибка ${err.message}` },
-    );
-  }
-};
+const NotFoundError = require('../errors/not-found-error');
+const ConflictDataError = require('../errors/conflict-data-error');
+const BadRequestError = require('../errors/bad-request-error');
 
-module.exports.login = (req, res) => {
+const JWT_SECRET_KEY = 'develop-secret';
+const PASSWORD_MINLENGTH = 8;
+
+module.exports.login = (req, res, next) => {
   const { email, password } = req.body;
   return User.findUserByCredentials(email, password)
     .then((user) => {
-      const token = jwt.sign({ _id: user._id }, 'super-strong-secret', { expiresIn: '7d' });
+      const token = jwt.sign({ _id: user._id }, JWT_SECRET_KEY, { expiresIn: '7d' });
       res.send({ token });
     })
-    .catch((err) => handlerError(err, res));
+    .catch(next);
 };
 
-module.exports.getUsers = (req, res) => {
+module.exports.getUsers = (req, res, next) => {
   User.find({})
     .then((users) => res.send({ users }))
-    .catch((err) => handlerError(err, res));
+    .catch(next);
 };
 
-module.exports.getUser = (req, res) => {
+module.exports.getUser = (req, res, next) => {
   const { userId } = req.params;
 
   User.findById({ _id: userId })
-    .orFail(() => ({ name: 'EmptyData' }))
-    .then((user) => res.send(user))
-    .catch((err) => handlerError(err, res));
+    .then((user) => {
+      if (!user) {
+        throw new NotFoundError('Пользователь с указанным _id не найден');
+      }
+      res.send(user);
+    })
+    .catch(next);
 };
 
-module.exports.getCurrentUser = (req, res) => {
+module.exports.getCurrentUser = (req, res, next) => {
   User.findById({ _id: req.user._id })
-    .orFail(() => ({ name: 'EmptyData' }))
-    .then((user) => res.send(user))
-    .catch((err) => handlerError(err, res));
+    .then((user) => {
+      if (!user) {
+        throw new NotFoundError('Пользователь с указанным _id не найден');
+      }
+      res.send(user);
+    })
+    .catch(next);
 };
 
-module.exports.createUser = (req, res) => {
+module.exports.createUser = (req, res, next) => {
   const {
     email, password, name, about, avatar,
   } = req.body;
 
-  bcrypt.hash(password, 10)
-    .then((hash) => {
-      User.create({
-        email,
-        password: hash,
-        name,
-        about,
-        avatar,
-      })
-        .then((user) => res.send(user))
-        .catch((err) => handlerError(err, res));
+  User.findOne({ email })
+    .then((user) => {
+      if (user) {
+        throw new ConflictDataError(`Пользователь с EMAIL: ${email} уже существует`);
+      }
+      if (!password || password.length < PASSWORD_MINLENGTH) {
+        throw new BadRequestError(`Минимальная длина пароля ${PASSWORD_MINLENGTH} символов`);
+      }
+      bcrypt.hash(password, 10)
+        .then((hash) => {
+          User.create({
+            email,
+            password: hash,
+            name,
+            about,
+            avatar,
+          })
+            .then((userCreated) => res.send(userCreated))
+            .catch((err) => next(new BadRequestError(`${Object.values(err.errors).map((error) => error.message).join(', ')}`)));
+        })
+        .catch(next);
     })
-    .catch((err) => handlerError(err, res));
+    .catch(next);
 };
 
-module.exports.updateUser = (req, res) => {
+module.exports.updateUser = (req, res, next) => {
   const { name, about } = req.body;
 
   User.findByIdAndUpdate(
@@ -82,12 +87,16 @@ module.exports.updateUser = (req, res) => {
     { name, about },
     { new: true, runValidators: true },
   )
-    .orFail(() => ({ name: 'EmptyData' }))
-    .then((user) => res.send(user))
-    .catch((err) => handlerError(err, res));
+    .then((user) => {
+      if (!user) {
+        throw new NotFoundError('Пользователь с указанным _id не найден');
+      }
+      res.send(user);
+    })
+    .catch(next);
 };
 
-module.exports.updateAvatarUser = (req, res) => {
+module.exports.updateAvatarUser = (req, res, next) => {
   const { avatar } = req.body;
 
   User.findByIdAndUpdate(
@@ -95,7 +104,11 @@ module.exports.updateAvatarUser = (req, res) => {
     { avatar },
     { new: true, runValidators: true },
   )
-    .orFail(() => ({ name: 'EmptyData' }))
-    .then((user) => res.send(user))
-    .catch((err) => handlerError(err, res));
+    .then((user) => {
+      if (!user) {
+        throw new NotFoundError('Пользователь с указанным _id не найден');
+      }
+      res.send(user);
+    })
+    .catch(next);
 };

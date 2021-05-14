@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const isEmail = require('validator/lib/isEmail');
+
+const CredentialsError = require('../errors/credentials-error');
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -8,14 +9,14 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Поле EMAIL должно быть заполнено'],
     unique: true,
     validate: {
-      validator: (v) => isEmail(v),
-      message: 'Неправильный формат почты',
+      validator: (v) => /\w+@\w+\.\w+/.test(v),
+      message: 'Неправильный формат почты {VALUE}',
     },
   },
   password: {
     type: String,
-    minlength: [8, '"{VALUE}" короче минимальной длины в 2 символа'],
-    required: [true, 'Поле EMAIL должно быть заполнено'],
+    required: [true, 'Поле PASSWORD должно быть заполнено'],
+    minlength: [8, '"{NAME}" короче минимальной длины в 8 символов'],
     select: false,
   },
   name: {
@@ -32,21 +33,26 @@ const userSchema = new mongoose.Schema({
   },
   avatar: {
     type: String,
+    validate: {
+      validator: (v) => /http[s]?:\/\/[www.]*[\w-._~:/?#[\]@!$&'()*+,;=]+/.test(v),
+      message: 'Неправильный формат ссылки {VALUE}',
+    },
     default: 'https://pictures.s3.yandex.net/resources/jacques-cousteau_1604399756.png',
   },
 });
 
+// eslint-disable-next-line func-names
 userSchema.statics.findUserByCredentials = function (email, password) {
   return this.findOne({ email }).select('+password')
     .then((user) => {
       if (!user) {
-        return Promise.reject(new Error('Неправильные почта или пароль'));
+        return Promise.reject(new CredentialsError('Неправильные почта или пароль'));
       }
 
       return bcrypt.compare(password, user.password)
         .then((matched) => {
           if (!matched) {
-            return Promise.reject(new Error('Неправильные почта или пароль'));
+            return Promise.reject(new CredentialsError('Неправильные почта или пароль'));
           }
 
           return user;

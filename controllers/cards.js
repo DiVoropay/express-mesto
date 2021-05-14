@@ -1,50 +1,57 @@
 const Card = require('../models/card');
 
-const handlerError = (err, res) => {
+const NotFoundError = require('../errors/not-found-error');
+const AccessError = require('../errors/access-error');
+const BadRequestError = require('../errors/bad-request-error');
+
+const handlerError = (err) => {
   switch (err.name) {
     case 'ValidationError':
-      return res.status(400).send(
-        { message: `${Object.values(err.errors).map((error) => error.message).join(', ')}` },
-      );
+      return new BadRequestError(`${Object.values(err.errors).map((error) => error.message).join(', ')}`);
     case 'CastError':
-      return res.status(400).send(
-        { message: `Ошибка запроса ${err.message}` },
-      );
+      return new BadRequestError(`Ошибка запроса ${err.message}`);
+    case 'AccessError':
+      return new AccessError('Вы можете удалять только свои карточки');
     case 'EmptyData':
-      return res.status(404).send(
-        { message: 'Карточка с указанным _id не найдена' },
-      );
-    default: return res.status(500).send(
-      { message: `На сервере произошла ошибка ${err.message}` },
-    );
+      return new NotFoundError('Карточка с указанным _id не найдена');
+    default: return err;
   }
 };
 
-module.exports.getCards = (req, res) => {
+module.exports.getCards = (req, res, next) => {
   Card.find({})
     .then((cards) => res.send(cards))
-    .catch((err) => handlerError(err, res));
+    .catch((err) => next(handlerError(err)));
 };
 
-module.exports.createCard = (req, res) => {
+module.exports.createCard = (req, res, next) => {
   const { name, link } = req.body;
   const owner = req.user._id;
 
   Card.create({ name, link, owner })
     .then((card) => res.send(card))
-    .catch((err) => handlerError(err, res));
+    .catch((err) => next(handlerError(err)));
 };
 
-module.exports.removeCard = (req, res) => {
+module.exports.removeCard = (req, res, next) => {
   const { cardId } = req.params;
+  const currentUser = req.user._id;
 
-  Card.findByIdAndRemove({ _id: cardId })
+  Card.findById({ _id: cardId })
     .orFail(() => ({ name: 'EmptyData' }))
-    .then((card) => res.send(card))
-    .catch((err) => handlerError(err, res));
+    .then((card) => {
+      const { owner } = card;
+      if (`${owner}` !== `${currentUser}`) {
+        throw handlerError({ name: 'AccessError' });
+      }
+      Card.findByIdAndRemove({ _id: cardId })
+        .then((removedCard) => res.send(removedCard))
+        .catch((err) => next(handlerError(err)));
+    })
+    .catch((err) => next(handlerError(err)));
 };
 
-module.exports.likeCard = (req, res) => {
+module.exports.likeCard = (req, res, next) => {
   const { cardId } = req.params;
   const owner = req.user._id;
 
@@ -55,10 +62,10 @@ module.exports.likeCard = (req, res) => {
   )
     .orFail(() => ({ name: 'EmptyData' }))
     .then((card) => res.send(card))
-    .catch((err) => handlerError(err, res));
+    .catch((err) => next(handlerError(err)));
 };
 
-module.exports.dislikeCard = (req, res) => {
+module.exports.dislikeCard = (req, res, next) => {
   const { cardId } = req.params;
   const owner = req.user._id;
 
@@ -69,5 +76,5 @@ module.exports.dislikeCard = (req, res) => {
   )
     .orFail(() => ({ name: 'EmptyData' }))
     .then((card) => res.send(card))
-    .catch((err) => handlerError(err, res));
+    .catch((err) => next(handlerError(err)));
 };
