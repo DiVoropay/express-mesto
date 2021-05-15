@@ -7,13 +7,14 @@ const ConflictDataError = require('../errors/conflict-data-error');
 const BadRequestError = require('../errors/bad-request-error');
 
 const JWT_SECRET_KEY = 'develop-secret';
-const PASSWORD_MINLENGTH = 8;
+const JWT_EXPIRES_IN = '7d';
+const PASSWORD_VALIDITY = /\w{8,}/;
 
 module.exports.login = (req, res, next) => {
   const { email, password } = req.body;
   return User.findUserByCredentials(email, password)
     .then((user) => {
-      const token = jwt.sign({ _id: user._id }, JWT_SECRET_KEY, { expiresIn: '7d' });
+      const token = jwt.sign({ _id: user._id }, JWT_SECRET_KEY, { expiresIn: JWT_EXPIRES_IN });
       res.send({ token });
     })
     .catch(next);
@@ -59,8 +60,8 @@ module.exports.createUser = (req, res, next) => {
       if (user) {
         throw new ConflictDataError(`Пользователь с EMAIL: ${email} уже существует`);
       }
-      if (!password || password.length < PASSWORD_MINLENGTH) {
-        throw new BadRequestError(`Минимальная длина пароля ${PASSWORD_MINLENGTH} символов`);
+      if (!PASSWORD_VALIDITY.test(password)) {
+        throw new BadRequestError('Недопустимые символы в пароле или длина менее 8 символов');
       }
       bcrypt.hash(password, 10)
         .then((hash) => {
