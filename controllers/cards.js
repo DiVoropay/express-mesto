@@ -1,27 +1,9 @@
 const Card = require('../models/card');
 
-const NotFoundError = require('../errors/not-found-error');
-const AccessError = require('../errors/access-error');
-const BadRequestError = require('../errors/bad-request-error');
-
-const handlerError = (err) => {
-  switch (err.name) {
-    case 'ValidationError':
-      return new BadRequestError(`${Object.values(err.errors).map((error) => error.message).join(', ')}`);
-    case 'CastError':
-      return new BadRequestError(`Ошибка запроса ${err.message}`);
-    case 'AccessError':
-      return new AccessError('Вы можете удалять только свои карточки');
-    case 'EmptyData':
-      return new NotFoundError('Карточка с указанным _id не найдена');
-    default: return err;
-  }
-};
-
 module.exports.getCards = (req, res, next) => {
   Card.find({})
     .then((cards) => res.send(cards))
-    .catch((err) => next(handlerError(err)));
+    .catch((err) => next(err));
 };
 
 module.exports.createCard = (req, res, next) => {
@@ -30,7 +12,7 @@ module.exports.createCard = (req, res, next) => {
 
   Card.create({ name, link, owner })
     .then((card) => res.send(card))
-    .catch((err) => next(handlerError(err)));
+    .catch((err) => next(err));
 };
 
 module.exports.removeCard = (req, res, next) => {
@@ -42,13 +24,14 @@ module.exports.removeCard = (req, res, next) => {
     .then((card) => {
       const { owner } = card;
       if (`${owner}` !== `${currentUser}`) {
-        throw handlerError({ name: 'AccessError' });
+        const AccessError = { name: 'AccessError' };
+        throw AccessError;
       }
       Card.findByIdAndRemove({ _id: cardId })
         .then((removedCard) => res.send(removedCard))
-        .catch((err) => next(handlerError(err)));
+        .catch((err) => next(err));
     })
-    .catch((err) => next(handlerError(err)));
+    .catch((err) => next(err));
 };
 
 module.exports.likeCard = (req, res, next) => {
@@ -62,7 +45,7 @@ module.exports.likeCard = (req, res, next) => {
   )
     .orFail(() => ({ name: 'EmptyData' }))
     .then((card) => res.send(card))
-    .catch((err) => next(handlerError(err)));
+    .catch((err) => next(err));
 };
 
 module.exports.dislikeCard = (req, res, next) => {
@@ -76,5 +59,5 @@ module.exports.dislikeCard = (req, res, next) => {
   )
     .orFail(() => ({ name: 'EmptyData' }))
     .then((card) => res.send(card))
-    .catch((err) => next(handlerError(err)));
+    .catch((err) => next(err));
 };
