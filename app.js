@@ -7,7 +7,7 @@ const { errors } = require('celebrate');
 const auth = require('./middlewares/auth');
 const { createUser, login } = require('./controllers/users');
 const handlerErrors = require('./middlewares/handler-errors');
-const { validateUserData, validateCardData } = require('./middlewares/validators');
+const { validateAuth, validateUserData, validateCardData } = require('./middlewares/validators');
 
 const { PORT = 3000 } = process.env;
 
@@ -26,8 +26,8 @@ mongoose.connect('mongodb://localhost:27017/mestodb', {
 app.use(express.static(path.join(__dirname, 'public')));
 app.post('/signin', validateUserData, login);
 app.post('/signup', validateUserData, createUser);
-app.use('/users', validateUserData, auth, require('./routes/users'));
-app.use('/cards', validateCardData, auth, validateCardData, require('./routes/cards'));
+app.use('/users', validateAuth, auth, require('./routes/users'));
+app.use('/cards', validateAuth, auth, validateCardData, require('./routes/cards'));
 
 app.use('/', (req, res) => {
   res.status(404).send({ message: 'Страница не существует' });
